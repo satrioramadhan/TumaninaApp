@@ -3,10 +3,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final String baseUrl = "https://d31e-36-68-54-156.ngrok-free.app";
+  final String baseUrl = "http://139.59.100.62:5000/";
   final String artikelBaseUrl =
       'https://artikel-islam.netlify.app/.netlify/functions/api/ms/detail/:id_article';
-  final String groqApiKey = 'rhs';
+  final String groqApiKey = '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';
   final String groqBaseUrl = 'https://api.groq.com/openai/v1';
   final String groqModel = 'llama-3.3-70b-versatile';
 
@@ -50,6 +50,22 @@ class ApiService {
   }
 
 
+  Future<bool> isSessionValid() async {
+    final prefs = await SharedPreferences.getInstance();
+    final loginTimestamp = prefs.getInt('login_timestamp');
+    final token = prefs.getString('token');
+
+    if (loginTimestamp == null || token == null) {
+      return false; // Selalu return false jika null
+    }
+
+    final currentTime = DateTime.now().millisecondsSinceEpoch;
+    final thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000; // 30 hari
+
+    return (currentTime - loginTimestamp) < thirtyDaysInMillis;
+  }
+
+
   // Fungsi Register
   Future<void> register(String username, String email, String password) async {
     final url = Uri.parse('$baseUrl/register');
@@ -73,59 +89,63 @@ class ApiService {
   }
 
   // Fungsi Login
+  // Fungsi Login yang sudah diperbarui
   Future<void> login(String email, String password) async {
-  final url = Uri.parse('$baseUrl/login');
-  try {
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-
-      // Simpan token ke SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('token', data['token']);
-      await prefs.setString('refresh_token', data['refresh_token']);
-
-      // Ambil data pengguna dari server
-      final userResponse = await http.get(
-        Uri.parse('$baseUrl/user'),
-        headers: {'Authorization': 'Bearer ${data['token']}'},
+    final url = Uri.parse('$baseUrl/login');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}),
       );
 
-      if (userResponse.statusCode == 200) {
-        final userData = jsonDecode(userResponse.body);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-        // Debug log untuk memastikan data user berhasil diambil
-        print('Data User: ${userData.toString()}');
+        // Simpan token ke SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', data['token']);
+        await prefs.setString('refresh_token', data['refresh_token']);
 
-        await prefs.setString('username', userData['username']);
-        await prefs.setString('email', userData['email']);
+        // Simpan timestamp login untuk validasi session (Tambahan)
+        await prefs.setInt('login_timestamp', DateTime.now().millisecondsSinceEpoch);
+
+        // Ambil data pengguna dari server
+        final userResponse = await http.get(
+          Uri.parse('$baseUrl/user'),
+          headers: {'Authorization': 'Bearer ${data['token']}'},
+        );
+
+        if (userResponse.statusCode == 200) {
+          final userData = jsonDecode(userResponse.body);
+
+          // Debug log untuk memastikan data user berhasil diambil
+          print('Data User: ${userData.toString()}');
+
+          await prefs.setString('username', userData['username']);
+          await prefs.setString('email', userData['email']);
+        } else {
+          final errorData = jsonDecode(userResponse.body);
+          print('Error User Fetch: ${errorData['msg']}');
+          throw Exception('Gagal mengambil data pengguna setelah login.');
+        }
       } else {
-        final errorData = jsonDecode(userResponse.body);
-        print('Error User Fetch: ${errorData['msg']}');
-        throw Exception('Gagal mengambil data pengguna setelah login.');
+        // Debug log jika login gagal
+        print('Login Failed: ${response.body}');
+        throw Exception(extractErrorMessage(response));
       }
-    } else {
-      // Debug log jika login gagal
-      print('Login Failed: ${response.body}');
-      throw Exception(extractErrorMessage(response));
+    } catch (e) {
+      // Debug log untuk mengetahui error apa yang terjadi
+      print('Login Exception: $e');
+      throw Exception(e.toString());
     }
-  } catch (e) {
-    // Debug log untuk mengetahui error apa yang terjadi
-    print('Login Exception: $e');
-    throw Exception(e.toString());
   }
-}
 
   Future<Map<String, String>> getUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    if (token == null) {
+    if (token == null || token.isEmpty) {
       throw Exception('Token tidak ditemukan. Silakan login ulang.');
     }
 
@@ -133,7 +153,10 @@ class ApiService {
     try {
       final response = await http.get(
         url,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
       );
 
       if (response.statusCode == 200) {
@@ -143,13 +166,13 @@ class ApiService {
           'email': data['email'] ?? '',
         };
       } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(errorData['msg'] ?? 'Gagal mengambil data pengguna');
+        throw Exception(extractErrorMessage(response));
       }
     } catch (e) {
-      throw Exception('Error saat mengambil data pengguna: $e');
+      throw Exception("Error saat mengambil data pengguna: $e");
     }
   }
+
 
   Future<void> refreshUserData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -187,10 +210,16 @@ class ApiService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    if (token == null) throw Exception("Token tidak ditemukan. Silakan login ulang.");
+
+    if (token == null || token.isEmpty) {
+      throw Exception("Token tidak ditemukan. Silakan login ulang.");
+    }
 
     final url = Uri.parse('$baseUrl/user');
-    final Map<String, dynamic> payload = {'username': username, 'email': email};
+    final Map<String, dynamic> payload = {
+      'username': username,
+      'email': email,
+    };
 
     if (oldPassword != null && newPassword != null) {
       payload['old_password'] = oldPassword;
@@ -200,7 +229,10 @@ class ApiService {
     try {
       final response = await http.put(
         url,
-        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+        headers: {
+          'Authorization': 'Bearer $token',  // Pastikan format Bearer benar
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode(payload),
       );
 
@@ -208,7 +240,7 @@ class ApiService {
         throw Exception(extractErrorMessage(response));
       }
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception("Error saat update profil: $e");
     }
   }
 
@@ -216,29 +248,39 @@ class ApiService {
   Future<void> deleteAccount() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    if (token == null) throw Exception("Token tidak ditemukan. Silakan login ulang.");
+
+    if (token == null || token.isEmpty) {
+      throw Exception("Token tidak ditemukan. Silakan login ulang.");
+    }
 
     final url = Uri.parse('$baseUrl/user');
     try {
       final response = await http.delete(
         url,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
       );
 
-      if (response.statusCode != 200) {
+      if (response.statusCode == 200) {
+        await prefs.clear();
+        print('Akun berhasil dihapus.');
+      } else {
         throw Exception(extractErrorMessage(response));
       }
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception("Error saat menghapus akun: $e");
     }
   }
+
 
   // Fungsi Submit Feedback
   Future<void> submitFeedback(String name, String feedback) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    if (token == null) {
+    if (token == null || token.isEmpty) {
       throw Exception('Token tidak ditemukan. Silakan login ulang.');
     }
 
@@ -247,8 +289,8 @@ class ApiService {
       final response = await http.post(
         url,
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
         },
         body: jsonEncode({
           'nama': name,
@@ -260,7 +302,7 @@ class ApiService {
         throw Exception(extractErrorMessage(response));
       }
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception("Error saat mengirim feedback: $e");
     }
   }
 
@@ -278,7 +320,7 @@ class ApiService {
           "messages": [
             {
               "role": "system",
-              "content": "Asisten Islami berbahasa Indonesia. Jawaban sopan dan bermanfaat."
+              "content": "Tumabot: Asisten Islami berbahasa Indonesia. Jawaban selalu Islami, sopan, dan bermanfaat. Jangan pernah membuat respon dengan bahasa inggris. Ini aplikasi Tumanina: Tuntunan Mandiri Niat dan Ibadah"
             },
             {"role": "user", "content": userMessage}
           ],
@@ -324,7 +366,32 @@ class ApiService {
   // Fungsi Logout
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    print('Logout berhasil.');
+    final token = prefs.getString('token');
+
+    if (token == null || token.isEmpty) {
+      throw Exception("Token tidak ditemukan. Silakan login ulang.");
+    }
+
+    final url = Uri.parse('$baseUrl/logout');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await prefs.clear();
+        print('Logout berhasil.');
+      } else {
+        throw Exception(extractErrorMessage(response));
+      }
+    } catch (e) {
+      throw Exception("Error saat logout: $e");
+    }
   }
+
+
 }

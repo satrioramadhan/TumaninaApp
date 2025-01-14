@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'components/instruction_popup.dart';
-import 'sholat_screen.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class GerakanDetailScreen extends StatefulWidget {
   final String title;
   final String description;
   final String bacaan;
-  final String videoPath;
+  final String videoUrl;
   final Widget? nextScreen;
   final Widget? previousScreen;
 
@@ -15,7 +15,7 @@ class GerakanDetailScreen extends StatefulWidget {
     required this.title,
     required this.description,
     required this.bacaan,
-    required this.videoPath,
+    required this.videoUrl,
     this.nextScreen,
     this.previousScreen,
   }) : super(key: key);
@@ -24,31 +24,25 @@ class GerakanDetailScreen extends StatefulWidget {
   _GerakanDetailScreenState createState() => _GerakanDetailScreenState();
 }
 
-class _GerakanDetailScreenState extends State<GerakanDetailScreen>
-    with TickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scaleAnimation;
+class _GerakanDetailScreenState extends State<GerakanDetailScreen> {
+  late final WebViewController _webViewController;
+
+  Future<void> _launchURL() async {
+  final Uri url = Uri.parse("https://deteksi.tumanina.me/");
+  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    throw Exception('Gagal membuka URL');
+  }
+}
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
 
-    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+    // Initialize WebViewController
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0x00000000))
+      ..loadRequest(Uri.parse(widget.videoUrl));
   }
 
   @override
@@ -57,176 +51,177 @@ class _GerakanDetailScreenState extends State<GerakanDetailScreen>
       appBar: AppBar(
         title: Text(
           widget.title,
-          style: const TextStyle(color: Color(0xFF004C7E)),
+          style: const TextStyle(color: Colors.white),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF004C7E)),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const SholatScreen()),
-              (route) => false,
-            );
-          },
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
+        backgroundColor: const Color.fromARGB(255, 84, 123, 85),
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 2,
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.white, Color(0xFFFFFFFF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionTitle("Cara Melakukan Gerakan ${widget.title}"),
-            const SizedBox(height: 10),
-            _buildSectionContent(widget.description),
-            const SizedBox(height: 20),
-            _buildSectionTitle("Bacaan ${widget.title}"),
-            const SizedBox(height: 10),
-            _buildSectionContent(widget.bacaan),
-            const Spacer(),
-            _buildBottomButtons(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF004C7E),
-      ),
-    );
-  }
-
-  Widget _buildSectionContent(String content) {
-    return Text(
-      content,
-      style: const TextStyle(
-        fontSize: 16,
-        color: Colors.black87,
-      ),
-    );
-  }
-
-  Widget _buildBottomButtons(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ElevatedButton(
-          onPressed: () {
-            // Logika untuk menampilkan video tutorial
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2DDCBE),
-            minimumSize: const Size.fromHeight(60),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 2,
-          ),
-          child: const Text(
-            "Lihat Video Tutorial",
-            style: TextStyle(fontSize: 18, color: Colors.white),
-          ),
-        ),
-        const SizedBox(height: 20),
-        AnimatedBuilder(
-          animation: _scaleAnimation,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _scaleAnimation.value,
-              child: ElevatedButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => const InstructionPopup(),
-                  );
-                },
+      backgroundColor: const Color.fromARGB(255, 244, 244, 244),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
+              _buildBubbleContainer(
+                title: "Cara Melakukan Gerakan",
+                content: widget.description,
+              ),
+              const SizedBox(height: 20),
+              _buildBubbleContainer(
+                title: "Bacaan Gerakan",
+                content: widget.bacaan,
+              ),
+              const SizedBox(height: 20),
+              _buildBubbleContainer(
+                title: "Video Tutorial",
+                content: null,
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: WebViewWidget(controller: _webViewController),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _launchURL,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2DDCBE),
-                  minimumSize: const Size.fromHeight(60),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
+                  backgroundColor: Colors.teal,
+                  padding: const EdgeInsets.symmetric(vertical: 14.0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
                 ),
                 child: const Text(
                   "Praktek Gerakan",
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
-            );
-          },
-        ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: widget.previousScreen != null
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => widget.previousScreen!),
-                        );
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2DDCBE),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: _buildNavigationBubble(
+                      "Sebelumnya",
+                      widget.previousScreen,
+                      context,
+                    ),
                   ),
-                  elevation: 2,
-                ),
-                child: const Text(
-                  "Sebelumnya",
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildNavigationBubble(
+                      "Selanjutnya",
+                      widget.nextScreen,
+                      context,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBubbleContainer({
+    required String title,
+    String? content,
+    Widget? child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 255, 255, 255),
+        borderRadius: BorderRadius.circular(16.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18.0,
+              fontWeight: FontWeight.bold,
+              color: Color.fromARGB(255, 63, 63, 63),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (content != null)
+            Text(
+              content,
+              style: const TextStyle(
+                fontSize: 16.0,
+                color: Color.fromARGB(179, 35, 35, 35),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: widget.nextScreen != null
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => widget.nextScreen!),
-                        );
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2DDCBE),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-                child: const Text(
-                  "Selanjutnya",
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
-              ),
+          if (child != null) child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationBubble(String label, Widget? screen, BuildContext context) {
+    return GestureDetector(
+      onTap: screen != null
+          ? () => Navigator.push(context, MaterialPageRoute(builder: (context) => screen!))
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14.0),
+        decoration: BoxDecoration(
+          color: screen != null ? const Color.fromARGB(255, 125, 179, 133) : Colors.grey,
+          borderRadius: BorderRadius.circular(12.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 8,
             ),
           ],
         ),
-      ],
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16.0,
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class WebViewScreen extends StatelessWidget {
+  final String url;
+
+  const WebViewScreen({Key? key, required this.url}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          "WebView",
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color.fromARGB(255, 84, 123, 85),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: WebViewWidget(
+        controller: WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setBackgroundColor(const Color(0x00000000))
+          ..loadRequest(Uri.parse(url)),
+      ),
     );
   }
 }

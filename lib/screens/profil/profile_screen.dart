@@ -6,6 +6,7 @@ import '../home_screen.dart';
 import '../fitur_login/login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'feedback_form.dart';
+import '../../services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _checkSession();
   }
 
   Future<void> _loadUserData() async {
@@ -31,6 +33,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _emailController.text = prefs.getString('email') ?? 'Tidak ditemukan';
     });
   }
+
+  void _checkSession() async {
+  final isValidSession = await ApiService().isSessionValid();
+  if (!isValidSession) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false, // Kembali ke LoginScreen jika sesi tidak valid
+    );
+  }
+}
 
 
   @override
@@ -124,15 +137,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             _buildProfileOption(
-              icon: Icons.exit_to_app,
-              text: 'Keluar',
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-              },
-            ),
+                icon: Icons.exit_to_app,
+                text: 'Keluar',
+                onTap: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.clear(); // Hapus semua data di SharedPreferences
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    (route) => false, // Hapus semua route sebelumnya
+                  );
+                },
+              ),
           ],
         ),
       ),

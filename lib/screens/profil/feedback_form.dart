@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../fitur_login/login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FeedbackForm extends StatefulWidget {
   const FeedbackForm({super.key});
@@ -13,30 +15,42 @@ class _FeedbackFormState extends State<FeedbackForm> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _nameController.text = prefs.getString('username') ?? 'Tidak ditemukan';
+    });
+  }
+
   void _submitFeedback() async {
     final name = _nameController.text.trim();
     final feedback = _feedbackController.text.trim();
 
     if (_formKey.currentState?.validate() ?? false) {
-  try {
-    await ApiService().submitFeedback(name, feedback);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Feedback berhasil dikirim"),
-        backgroundColor: Color(0xFF2DDCBE),
-      ),
-    );
-    Navigator.pop(context); // Kembali ke halaman sebelumnya
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Gagal mengirim feedback: $e"),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-}
-
+      try {
+        await ApiService().submitFeedback(name, feedback);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Feedback berhasil dikirim"),
+            backgroundColor: Color(0xFF2DDCBE),
+          ),
+        );
+        Navigator.pop(context);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Gagal mengirim feedback: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -49,6 +63,7 @@ class _FeedbackFormState extends State<FeedbackForm> {
         children: [
           TextFormField(
             controller: _nameController,
+            enabled: false,
             decoration: InputDecoration(
               labelText: 'Nama',
               labelStyle: const TextStyle(color: Color(0xFF004C7E)),
@@ -59,15 +74,9 @@ class _FeedbackFormState extends State<FeedbackForm> {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: Color(0xFF004C7E)),
               ),
-              fillColor: Colors.white,
+              fillColor: Colors.grey[200],
               filled: true,
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Nama tidak boleh kosong';
-              }
-              return null;
-            },
           ),
           const SizedBox(height: 12),
           TextFormField(

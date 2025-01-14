@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'fitur_login/login_screen.dart';
 
 class IntroScreen extends StatefulWidget {
@@ -34,6 +35,29 @@ class _IntroScreenState extends State<IntroScreen> {
       "image": "assets/splash/Logo1 1.png"
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIntroStatus();
+  }
+
+  Future<void> _checkIntroStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool? seenIntro = prefs.getBool('seenIntro') ?? false;
+
+    if (seenIntro) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
+  }
+
+  Future<void> _setIntroSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('seenIntro', true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,32 +126,54 @@ class _IntroScreenState extends State<IntroScreen> {
     return Padding(
       padding: const EdgeInsets.all(64.0),
       child: _currentPage == _introData.length - 1
-          ? Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
+          ? Column(
+              children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    await _setIntroSeen();
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2DDCBE),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(32),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2DDCBE),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(32),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 64.0, vertical: 12.0),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 64.0, vertical: 12.0),
-                ),
-                child: const Text(
-                  "Mulai",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
+                  child: const Text(
+                    "Mulai",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () async {
+                    await _setIntroSeen();
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    "Jangan tampilkan lagi",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
             )
           : Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

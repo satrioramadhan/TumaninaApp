@@ -26,7 +26,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isOldPasswordVisible = false;
   bool _isNewPasswordVisible = false;
 
-
   @override
   void initState() {
     super.initState();
@@ -45,12 +44,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
+    if (newPassword.isNotEmpty && oldPassword.isEmpty) {
+      _showSnackBar("Password Lama harus diisi jika ingin mengganti Password Baru.", Colors.red);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Update profil
       await ApiService().updateProfile(
         username: updatedUsername,
         email: updatedEmail,
@@ -58,17 +61,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         newPassword: newPassword.isEmpty ? null : newPassword,
       );
 
-      // Ambil data terbaru dari API
       final userData = await ApiService().getUserInfo();
 
-      // Simpan data terbaru ke SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('username', userData['username'] ?? 'DefaultUsername');
       await prefs.setString('email', userData['email'] ?? 'DefaultEmail');
 
       _showSnackBar("Profil berhasil diperbarui.", const Color(0xFF2DDCBE));
 
-      // Navigasi ulang ke halaman profil dengan data terbaru
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -79,7 +79,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       );
     } catch (e) {
-      // Tampilkan pesan error dari server
       _showSnackBar(e.toString(), Colors.red);
     } finally {
       setState(() {
@@ -89,27 +88,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _deleteAccount() async {
-    setState(() {
-      _isLoading = true;
-    });
+    bool? confirmDelete = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            "Konfirmasi Hapus Akun",
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Apakah Anda yakin ingin menghapus akun Anda? Tindakan ini tidak dapat dibatalkan.",
+            style: TextStyle(color: Colors.black),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Hapus", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
 
-    try {
-      await ApiService().deleteAccount();
-      _showSnackBar("Akun berhasil dihapus.", Colors.red);
-
-      // Navigasi ke layar login
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
-    } catch (e) {
-      // Tampilkan pesan error dari server
-      _showSnackBar(e.toString(), Colors.red);
-    } finally {
+    if (confirmDelete == true) {
       setState(() {
-        _isLoading = false;
+        _isLoading = true;
       });
+
+      try {
+        await ApiService().deleteAccount();
+        _showSnackBar("Akun berhasil dihapus.", Colors.red);
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      } catch (e) {
+        _showSnackBar(e.toString(), Colors.red);
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -127,16 +152,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required IconData icon,
   }) {
     return InputDecoration(
-      hintText: hintText,
-      hintStyle: TextStyle(color: Colors.grey.shade500),
-      floatingLabelBehavior: FloatingLabelBehavior.never,
-      prefixIcon: Icon(icon, color: const Color(0xFF2D9CDB)),
-      border: OutlineInputBorder(
+      labelText: hintText,
+      labelStyle: const TextStyle(color: Color(0xFF004C7E)),
+      prefixIcon: Icon(icon, color: const Color(0xFF004C7E)),
+      enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: Color(0xFF004C7E)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color.fromARGB(255, 62, 207, 230)),
       ),
       filled: true,
-      fillColor: Colors.grey.shade200,
+      fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
     );
   }
@@ -144,6 +172,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           "Edit Profil",
@@ -159,20 +188,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
+              const Text(
                 "Edit Profil",
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
+                  color: Color(0xFF004C7E),
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 "Perbarui informasi profil Anda",
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey.shade600,
+                  color: Color(0xFF004C7E),
                 ),
               ),
               const SizedBox(height: 24),
@@ -248,20 +277,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   : ElevatedButton(
                       onPressed: _saveProfile,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2D9CDB),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                        elevation: 5,
-                        shadowColor: const Color(0xFF2D9CDB).withOpacity(0.4),
+                        padding: const EdgeInsets.all(0),
                       ),
-                      child: const Text(
-                        "Simpan Perubahan",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      child: Ink(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF004C7E), Color(0xFF2DDCBE)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.all(Radius.circular(30)),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            "Simpan Perubahan",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),
