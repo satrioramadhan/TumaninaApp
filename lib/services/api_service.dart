@@ -6,7 +6,7 @@ class ApiService {
   final String baseUrl = "http://139.59.100.62:5000/";
   final String artikelBaseUrl =
       'https://artikel-islam.netlify.app/.netlify/functions/api/ms/detail/:id_article';
-  final String groqApiKey = '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';
+  final String groqApiKey = 'wkwkwk';
   final String groqBaseUrl = 'https://api.groq.com/openai/v1';
   final String groqModel = 'llama-3.3-70b-versatile';
 
